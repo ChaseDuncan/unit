@@ -1,2 +1,2 @@
 # UNIT
-UNet Vision Transformer
+UNet Image Transformer
