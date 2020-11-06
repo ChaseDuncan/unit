@@ -1,0 +1,3 @@
+[submodule "batchgen"]
+	path = batchgen
+	url = https://github.com/MIC-DKFZ/batchgenerators.git
