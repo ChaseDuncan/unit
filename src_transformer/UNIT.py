@@ -32,6 +32,12 @@ class FeedForward(nn.Module):
             nn.Linear(dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
+ 
+            nn.Linear(hidden_dim, hidden_dim), #ADDED THIS
+            nn.GELU(),
+            nn.Dropout(dropout),
+
+
             nn.Linear(hidden_dim, dim),
             nn.Dropout(dropout)
         )
@@ -121,8 +127,10 @@ class UNIT(nn.Module):
             nn.Linear(dim * (1 + num_patches), mlp_dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(mlp_dim, (2 * image_size * image_size)),
-            nn.Softmax()
+            nn.Linear(mlp_dim, (image_size * image_size)),
+            #nn.ReLU()
+            #nn.Softmax()
+            nn.Sigmoid()
         )
 
     def forward(self, img, mask=None):
@@ -142,7 +150,7 @@ class UNIT(nn.Module):
 
         #x = self.to_cls_token(x[:, 0])
         x = rearrange(x[:, :], 'b p d -> b (p d)')
-        return torch.reshape(self.mlp_head(x), (b, 2, self.image_size, self.image_size))
+        return torch.reshape(self.mlp_head(x), (b, self.image_size, self.image_size))
         #return x[:, 1:]
 #'''
 '''

@@ -74,8 +74,8 @@ def chunk_slice(chunk_x, chunk_y, image, segmented_image):
 
 
 def load_data(range_min, range_max):
-    chunk_x = 60 #240#
-    chunk_y = 60 # 155#
+    chunk_x = 50 #240#
+    chunk_y = 50 # 155#
 
     chunked_images_arr = []
     chunked_segmented_images_arr = []
@@ -212,25 +212,30 @@ def to_one_hot_2d(n):
 
 
 def train_unit():
-    model = UNIT(image_size=60, patch_size=6, dim=30, depth=5, heads=30, mlp_dim=200, channels=4).to(device)
+    model = UNIT(image_size=50, patch_size=5, dim=40, depth=9, heads=40, mlp_dim=100, channels=4).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCELoss()
     #criterion = nn.KLDivLoss()
     #optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.1)
     #optimizer = optim.SGD(model.parameters(), nesterov=True, momentum=0.1, lr=0.1)
     optimizer = optim.Adam(model.parameters())
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5)
     epoch = 0
-    while epoch != 10000: #TODO: CHANGE TO 10000
+    while epoch != 10000:
 
         batch_size = 8
         current_batch_index = (int(epoch/10) % 30)
         lower_index = (current_batch_index * batch_size) + 10
         upper_index = ((1+current_batch_index) * batch_size) + 10
+        #lower_index = 1
+        #upper_index = 2
         print('lower_index:' + str(lower_index))
         print('upper_index:' + str(upper_index))
         chunked_images, chunked_segmented_images, images_have_tumor = load_data(lower_index, upper_index)
 
-        for batch_epoch in range(0, 50): #TODO: CHANGE TO 100
+        for batch_epoch in range(0, 50):
+            optimizer.zero_grad()
+
             running_loss = 0.0
         
 
@@ -249,22 +254,23 @@ def train_unit():
             model_input = torch.from_numpy(model_input).to(device)
 
             model_output = model_output.transpose((0, 1, 2))
-            model_output = torch.LongTensor(model_output.astype(np.long)).to(device)
+            model_output = torch.Tensor(model_output).to(device)
 
             outputs = model(model_input)
             
             loss = criterion(outputs, model_output)
             loss.backward()
             optimizer.step()
+            scheduler.step(loss)
 
             running_loss += loss.item()
 
             print('[%d] loss: %.3f' % (epoch + 1, running_loss))
 
-            if(epoch%1500 == 900):
+            if(epoch%500 == 200):
                 evaluate(model, True)
                 model.train()
-            elif(epoch % 200 == 2):
+            elif(epoch % 100 == 2):
                 evaluate(model, False)
                 model.train()
             
@@ -297,14 +303,14 @@ def evaluate(model, show_it):
     print(model_input.shape)
 
     model_output = model_output.transpose((0, 1, 2))
-    model_output = torch.LongTensor(model_output).to(device)
+    model_output = torch.Tensor(model_output).to(device)
 
 
 
     outputs = model(model_input)
 
     #criterion = nn.MSELoss()
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCELoss()
     loss = criterion(outputs, model_output)
     loss_amount = loss.item()
     test_losses.append(loss_amount)
@@ -315,17 +321,17 @@ def evaluate(model, show_it):
         f, ax = plt.subplots(6, 2)
         ax[0, 0].imshow(model_input.cpu().detach().numpy()[11, 1:4, :, :].transpose((1, 2, 0)))
         ax[0, 1].imshow(chunked_images[12, :, :, 1:4])
-        ax[1, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[11, :, :], axis=0))
+        ax[1, 0].imshow(outputs.cpu().detach().numpy()[11, :, :])
         ax[1, 1].imshow(model_output.cpu().detach().numpy()[11, :, :])
-        ax[2, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[20, :, :], axis=0))
+        ax[2, 0].imshow(outputs.cpu().detach().numpy()[20, :, :])
         ax[2, 1].imshow(model_output.cpu().detach().numpy()[20, :, :])
-        ax[3, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[23, :, :], axis=0))
+        ax[3, 0].imshow(outputs.cpu().detach().numpy()[23, :, :])
         ax[3, 1].imshow(model_output.cpu().detach().numpy()[23, :, :])
-        ax[4, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[21, :, :], axis=0))
+        ax[4, 0].imshow(outputs.cpu().detach().numpy()[21, :, :])
         ax[4, 1].imshow(model_output.cpu().detach().numpy()[21, :, :])
-        ax[4, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[5, :, :], axis=0))
+        ax[4, 0].imshow(outputs.cpu().detach().numpy()[5, :, :])
         ax[4, 1].imshow(model_output.cpu().detach().numpy()[5, :, :])
-        ax[5, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[2, :, :], axis=0))
+        ax[5, 0].imshow(outputs.cpu().detach().numpy()[2, :, :])
         ax[5, 1].imshow(model_output.cpu().detach().numpy()[2, :, :])
         plt.show()
 
