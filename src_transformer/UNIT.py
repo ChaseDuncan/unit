@@ -122,7 +122,7 @@ class UNIT(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(mlp_dim, (2 * image_size * image_size)),
-            nn.ReLU()
+            nn.Softmax()
         )
 
     def forward(self, img, mask=None):
