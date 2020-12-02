@@ -1,3 +1,8 @@
+src_transformer/dataset
+.vscode
+*.stackdump
+*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

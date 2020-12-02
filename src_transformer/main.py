@@ -74,8 +74,8 @@ def chunk_slice(chunk_x, chunk_y, image, segmented_image):
 
 
 def load_data(range_min, range_max):
-    chunk_x = 50
-    chunk_y = 50
+    chunk_x = 40 #240#
+    chunk_y = 40 # 155#
 
     chunked_images_arr = []
     chunked_segmented_images_arr = []
@@ -97,12 +97,23 @@ def load_data(range_min, range_max):
 
         data = data.transpose((2, 1, 3, 0))
         segmented = segmented.transpose((1, 0, 2))
-
+        segmented = np.clip(segmented, 0.0, 1.0)
 
 
         for j in range(0, data.shape[2]):
 
+            #if you want to chunk use this
             chunked_image, chunked_segmented_image, image_has_tumor = chunk_slice(chunk_x, chunk_y, data[:, :, j], segmented[:, :, j])
+            #chunked_image = [data[:,:,j]]
+            #chunked_segmented_image = [segmented[:,:,j]]
+            
+            #print(data[:,:,j].shape)
+            #plt.imshow(data[:,:,100, 1:4])
+            #plt.show()
+            #chunked_image = data[:, :, j]
+            #chunked_segmented_image = segmented[:,:,j]
+            #print(chunked_image.shape)
+            #print(chunked_segmented_image.shape)
 
             chunked_images_arr = chunked_images_arr + chunked_image
             chunked_segmented_images_arr = chunked_segmented_images_arr + chunked_segmented_image
@@ -127,7 +138,7 @@ def load_data(range_min, range_max):
     for i in range(0, len(chunked_images_arr)):
         chunked_images[i] = chunked_images_arr[i]
         chunked_segmented_images[i] = chunked_segmented_images_arr[i]
-        images_have_tumor[i] = images_have_tumor_arr[i]
+        #images_have_tumor[i] = images_have_tumor_arr[i]
     print('finished copying')
 
     # i = 0
@@ -201,34 +212,41 @@ def to_one_hot_2d(n):
 
 
 def train_unit():
-    chunked_images, chunked_segmented_images, images_have_tumor = load_data(14, 40)
+    chunked_images, chunked_segmented_images, images_have_tumor = load_data(12, 15)
 
-    model = UNIT(image_size=50, patch_size=5, num_classes=2, dim=60, depth=20, heads=30, mlp_dim=200, channels=4).to(device)
+    model = UNIT(image_size=40, patch_size=5, dim=30, depth=10, heads=30, mlp_dim=100, channels=4).to(device)
 
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    for epoch in range(0, 4000):
+    #criterion = nn.MSELoss()
+    #criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()
+    #optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.1)
+    for epoch in range(0, 10000):
         running_loss = 0.0
         
 
         total_size = chunked_images.shape[0]
         frac = int(total_size / 10)
-        #print(frac)
         current_index = epoch % 10
         
 
         model_input = np.copy(chunked_images[current_index*frac:((1 + current_index)*frac)])
         model_output = chunked_segmented_images[current_index*frac:((1 + current_index)*frac)]
         
+        model_input= np.copy(chunked_images)
+        model_output = np.copy(chunked_segmented_images)
+
         model_input = model_input.transpose((0, 3, 1, 2))
         model_input = torch.from_numpy(model_input).to(device)
 
         model_output = model_output.transpose((0, 1, 2))
-        model_output = torch.Tensor(model_output).to(device)
+        model_output = torch.LongTensor(model_output.astype(np.long)).to(device)
 
         outputs = model(model_input)
 
+        #print(outputs.shape)
+        #print(model_output.shape)
+        #print(torch.max(model_output))
         loss = criterion(outputs, model_output)
         loss.backward()
         optimizer.step()
@@ -242,7 +260,7 @@ def train_unit():
         #    ax[0].imshow(outputs.cpu().detach().numpy()[23, :, :], cmap='gray')
         #    ax[1].imshow(model_output.cpu().detach().numpy()[23, :, :], cmap='gray')
         #    plt.show()
-        if(epoch % 500 == 2):
+        if(epoch % 5000 == 2):
             evaluate(model, False)
             model.train()
     return model
@@ -257,24 +275,27 @@ def evaluate(model, show_it):
     model_input = model_input.transpose((0, 3, 1, 2))
     model_input = torch.from_numpy(model_input).to(device)
 
+    print(model_input.shape)
+
     model_output = model_output.transpose((0, 1, 2))
-    model_output = torch.Tensor(model_output).to(device)
+    model_output = torch.LongTensor(model_output).to(device)
 
 
 
-    outputs = model(model_input)    
+    outputs = model(model_input)
 
-    criterion = nn.MSELoss()
+    #criterion = nn.MSELoss()
+    criterion = nn.CrossEntropyLoss()
     loss = criterion(outputs, model_output)
     print(loss.item())
 
     show_it = True
     if show_it:
-        f, ax = plt.subplots(1, 2)
-        #ax[0].imshow(outputs.cpu().detach().numpy()[1223, :, :], cmap='gray')
-        #ax[1].imshow(model_output.cpu().detach().numpy()[1223, :, :], cmap='gray')
-        ax[0].imshow(outputs.cpu().detach().numpy()[11, :, :])
-        ax[1].imshow(model_output.cpu().detach().numpy()[11, :, :])
+        f, ax = plt.subplots(2, 2)
+        ax[0, 0].imshow(model_input.cpu().detach().numpy()[11, 1:4, :, :].transpose((1, 2, 0)))
+        ax[0, 1].imshow(chunked_images[12, :, :, 1:4])
+        ax[1, 0].imshow(np.argmax(outputs.cpu().detach().numpy()[11, :, :], axis=0))
+        ax[1, 1].imshow(model_output.cpu().detach().numpy()[11, :, :])
         plt.show()
 
 def main():
